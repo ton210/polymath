@@ -99,7 +99,9 @@ polymath/
     logical_rv.py# 🟡  tiered relationship engine + LLM
     longshot.py  # ⚠️  extreme-price candidates
   relationships.py # candidate-pair gating, clustering, LLM cache
-  ledger.py      # append-only JSONL signal log + replay/backtest
+  ledger.py      # append-only JSONL signal log
+  paper.py       # capital-aware simulated execution + mark-to-market scoring
+  report.py      # per-(module, profile) experiment scorecard
   scanner.py     # orchestrates: fetch -> snapshot -> run detectors -> collect
   config.py      # thresholds & settings
   cli.py         # typer entrypoint, rich table rendering
@@ -152,8 +154,8 @@ mutual-exclusivity constraints. No LLM.
 ## 8. Longshot module (`detectors/longshot.py`)
 
 Config-driven band + filters; ranked candidates only. Always ⚠️ and tagged
-`UNVALIDATED`. No live edge is asserted until the ledger replay (Section 9) shows
-a measured bias on resolved markets. Until then it exists to *collect data*, and
+`UNVALIDATED`. No live edge is asserted until the paper-harness report (Section 9)
+shows a measured bias on resolved markets. Until then it exists to *collect data*, and
 the user may act on it at their own stated risk.
 
 ## 9. Paper-trading experiment harness (`ledger.py`, `paper.py`, `report.py`)
