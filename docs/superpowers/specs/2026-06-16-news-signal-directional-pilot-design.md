@@ -68,7 +68,7 @@ New code lives under `src/polymath/signals/`; ledger + report are reused.
 ```
 src/polymath/signals/
   nearterm.py     # select markets resolving within the window (Gamma)
-  research.py     # Researcher protocol; ClaudeResearcher (API + web search); StubResearcher
+  research.py     # Researcher protocol; ClaudeCliResearcher (claude CLI + web search); StubResearcher
   estimate.py     # Estimate dataclass: prob, confidence, category, signals{}, rationale, side
   select.py       # diverse stratified sampling of daily bets
   directional.py  # build flat-$100 directional bet rows for the ledger
@@ -88,14 +88,23 @@ cost, preferring the most liquid.
 
 ### 5.2 research.py + estimate.py
 `Researcher` protocol: `research(market) -> Estimate`.
-- `ClaudeResearcher`: calls the Anthropic API with the **web-search tool**,
-  prompting Claude to (a) summarize current state from fresh sources, (b) output a
-  probability for the YES outcome, (c) a confidence 0–1, (d) a category, (e) a
-  structured `signals` dict (e.g. `latest_news_age_hours`, `news_direction`,
-  `consensus_strength`, `source_count`), and (f) a one-line rationale. Returns a
-  validated `Estimate`. Model + max searches are configurable (`research_model`,
-  default a capable browsing-capable Claude model).
-- `StubResearcher`: returns canned `Estimate`s for offline tests; no network.
+- `ClaudeCliResearcher`: shells out to the **local Claude Code CLI in headless
+  mode** (`claude -p <prompt> --output-format json --allowedTools WebSearch`),
+  which is already authenticated on the operator's machine — **no API key, no
+  separate billing** (uses the existing Claude Code session/subscription). The
+  prompt asks Claude to (a) web-search current state, (b) output a probability for
+  the YES outcome, (c) a confidence 0–1, (d) a category, (e) a structured
+  `signals` dict (e.g. `latest_news_age_hours`, `news_direction`,
+  `consensus_strength`, `source_count`), and (f) a one-line rationale, returning a
+  single strict JSON object. The CLI's JSON envelope is parsed, the embedded JSON
+  estimate extracted and validated into an `Estimate`.
+  - **Injectable runner:** `ClaudeCliResearcher(runner=...)` takes a
+    `runner(cmd: list[str]) -> str` callable (default: `subprocess.run`), so the
+    prompt-building and JSON-parsing logic is fully unit-testable with a fake
+    runner returning canned CLI output — no real CLI in tests.
+  - Configurable: `claude_cli_path` (default `claude`), `research_model` (passed
+    as `--model`), `research_timeout`.
+- `StubResearcher`: returns canned `Estimate`s for offline pipeline tests.
 
 `Estimate.side`/edge are derived against the live market price by the caller.
 
@@ -135,24 +144,28 @@ and `realized_pnl=null` until settled.
 
 `bet_window_hours` (48), `bet_min_liquidity`, `max_candidates` (40),
 `bets_per_day` (8), `bet_stake` (100.0), `min_edge` (0.10),
-`research_model`, `research_max_searches`. Reuses `ledger_path`, `profiles`.
+`claude_cli_path` (`claude`), `research_model` (passed as `--model`),
+`research_timeout` (180s). Reuses `ledger_path`, `profiles`.
 
 ## 8. Error handling & cost control
 
-- Research failures (API error, unparseable output) skip that candidate and log a
-  warning; a run never aborts on one bad market.
-- `max_candidates` bounds web-search LLM calls per `bet` run (~20–40).
+- Research failures (CLI non-zero exit, timeout, or unparseable output) skip that
+  candidate and log a warning; a run never aborts on one bad market.
+- `max_candidates` bounds Claude-CLI invocations per `bet` run (~20–40); these use
+  the existing Claude Code session, not separate API billing.
 - Gamma calls reuse the existing retry/pagination-hardened client.
 - `settle` tolerates markets that resolve late or ambiguously (left `open`).
 
 ## 9. Testing
 
-- `StubResearcher` drives all selection/logging/settle/analyze tests — no live API.
+- `StubResearcher` drives all selection/logging/settle/analyze tests — no CLI.
+- `ClaudeCliResearcher` is unit-tested with a **fake runner** returning canned CLI
+  output, verifying prompt construction and JSON parsing/validation — no real CLI.
 - Unit-test: directional PnL math (§2), calibration bucketing, selection
   diversity (no stratum over-represented), settle idempotency and win/loss logic.
 - Gamma near-term filter tested against recorded fixtures.
-- A single live smoke test (manual, documented) confirms `ClaudeResearcher`
-  returns a valid `Estimate` against the real API.
+- A single live smoke test (manual, documented) confirms `ClaudeCliResearcher`
+  returns a valid `Estimate` by invoking the real `claude` CLI once.
 
 ## 10. Honest caveats (surfaced in the report)
 
@@ -169,7 +182,8 @@ and `realized_pnl=null` until settled.
 2. `directional` + ledger wiring + `polymath bet` (with stub) end-to-end.
 3. `settle` + directional PnL.
 4. `analyze` (calibration, win-vs-price, attribution).
-5. `ClaudeResearcher` (live API + web search) behind the protocol; manual smoke test.
+5. `ClaudeCliResearcher` (local `claude` CLI + web search) behind the protocol,
+   unit-tested via a fake runner; manual live smoke test.
 6. Run the 7-day pilot.
 
 ## 12. Relationship to the rest of Polymath
