@@ -32,6 +32,14 @@ def _parse_market(raw: dict) -> Market | None:
     tokens = [Token(str(tid), str(o)) for tid, o in zip(token_ids, outcomes)]
     events = raw.get("events") or []
     event_id = str(events[0]["id"]) if events and events[0].get("id") is not None else None
+    prices_raw = raw.get("outcomePrices")
+    yes_price = None
+    if prices_raw:
+        try:
+            yes_price = float(json.loads(prices_raw)[0])
+        except (json.JSONDecodeError, ValueError, IndexError, TypeError):
+            yes_price = None
+    gamma_id = str(raw["id"]) if raw.get("id") is not None else None
     return Market(
         condition_id=str(condition_id),
         question=raw.get("question", ""),
@@ -44,6 +52,8 @@ def _parse_market(raw: dict) -> Market | None:
         liquidity=float(raw.get("liquidityNum") or 0.0),
         volume=float(raw.get("volumeNum") or 0.0),
         event_id=event_id,
+        gamma_id=gamma_id,
+        yes_price=yes_price,
     )
 
 

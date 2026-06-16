@@ -49,6 +49,8 @@ class Market:
     liquidity: float
     volume: float
     event_id: str | None = None
+    gamma_id: str | None = None
+    yes_price: float | None = None
 
     def is_binary(self) -> bool:
         return len(self.tokens) == 2
