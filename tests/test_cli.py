@@ -53,6 +53,23 @@ def test_scan_prints_opportunity(monkeypatch):
     assert "binary_yes_no" in result.stdout
 
 
+def test_watch_persists_paperbook_across_ticks(monkeypatch, tmp_path):
+    _patch_clients(monkeypatch)
+    monkeypatch.setattr(cli.time, "sleep", lambda *_: None)  # no real waiting
+    ledger = tmp_path / "ledger.jsonl"
+    result = runner.invoke(
+        cli.app,
+        ["watch", "--interval", "1", "--iterations", "2", "--ledger", str(ledger)],
+    )
+    assert result.exit_code == 0
+    from polymath.ledger import Ledger
+    rows = Ledger(ledger).read_all()
+    # Same standing arb appears on both ticks: entered once, deduped the second time.
+    assert len(rows) == 2
+    statuses = [r["status"] for r in rows]
+    assert statuses == ["entered", "deduped"]
+
+
 def test_scan_record_writes_ledger_then_report(monkeypatch, tmp_path):
     _patch_clients(monkeypatch)
     ledger = tmp_path / "ledger.jsonl"

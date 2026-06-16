@@ -82,12 +82,16 @@ def watch(
     cfg = _load(config)
     eff = cfg.effective(profile)
     delay = interval or eff.watch_interval_seconds
+    # One ledger + PaperBook for the whole watch session, so a standing arb that
+    # reappears every tick is deduped and counted once rather than re-entered.
+    # Capital is not recycled (a simplification): each distinct opportunity
+    # consumes its sizing budget for the life of the session.
+    led = Ledger(ledger or eff.ledger_path)
+    book = PaperBook(bankroll=eff.bankroll, max_position_pct=eff.max_position_pct,
+                     assumed_slippage=eff.assumed_slippage)
     n = 0
     while True:
         snap, opps = asyncio.run(_scan_once(cfg, profile, only))
-        led = Ledger(ledger or eff.ledger_path)
-        book = PaperBook(bankroll=eff.bankroll, max_position_pct=eff.max_position_pct,
-                         assumed_slippage=eff.assumed_slippage)
         for o in opps:
             led.append(book.consider(o, snap.timestamp))
         console.print(f"[{snap.timestamp.isoformat()}] recorded {len(opps)} signals")
@@ -99,13 +103,14 @@ def watch(
 
 @app.command()
 def report(
+    profile: str = typer.Option("default", help="resolve ledger path like scan/watch"),
     ledger: str = typer.Option(None),
     module: str = typer.Option(None, help="filter by module"),
     min_entered: int = typer.Option(10),
     config: str = typer.Option(None),
 ):
     cfg = _load(config)
-    led = Ledger(ledger or cfg.ledger_path)
+    led = Ledger(ledger or cfg.effective(profile).ledger_path)
     rows = led.read_all()
     if module:
         rows = [r for r in rows if r.get("module") == module]

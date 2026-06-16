@@ -8,15 +8,15 @@ def _book(snap: Snapshot, token_id: str) -> OrderBook:
     return snap.books.get(token_id, OrderBook(token_id))
 
 
-def _finalize(size, cost, fee_bps, payout_per_set):
+def _finalize(size, cost, fee_bps, gas_per_redeem, payout_per_set):
     gross = size * payout_per_set
     fees = cost * (fee_bps / 10_000.0)
-    net = gross - cost - fees
+    net = gross - cost - fees - gas_per_redeem
     roi = (net / cost) if cost > 0 else 0.0
     return net, roi
 
 
-def _binary(snap, m: Market, min_roi, min_profit_usd, fee_bps, profile):
+def _binary(snap, m: Market, min_roi, min_profit_usd, fee_bps, gas_per_redeem, profile):
     yes, no = m.tokens[0], m.tokens[1]
     yes_book, no_book = _book(snap, yes.token_id), _book(snap, no.token_id)
     yes_ladder = effective_ask_ladder(yes_book, no_book)
@@ -24,7 +24,7 @@ def _binary(snap, m: Market, min_roi, min_profit_usd, fee_bps, profile):
     size, cost = walk_matched_sets([yes_ladder, no_ladder], payout=1.0)
     if size <= 0:
         return None
-    net, roi = _finalize(size, cost, fee_bps, 1.0)
+    net, roi = _finalize(size, cost, fee_bps, gas_per_redeem, 1.0)
     if net < min_profit_usd or roi < min_roi:
         return None
     return Opportunity(
@@ -44,7 +44,7 @@ def _binary(snap, m: Market, min_roi, min_profit_usd, fee_bps, profile):
     )
 
 
-def _neg_risk(snap, event, min_roi, min_profit_usd, fee_bps, profile):
+def _neg_risk(snap, event, min_roi, min_profit_usd, fee_bps, gas_per_redeem, profile):
     # A valid hedge needs every mutually-exclusive outcome to be tradeable; if
     # any member is missing, non-binary, or closed, the set is incomplete -> skip.
     members = []
@@ -66,7 +66,7 @@ def _neg_risk(snap, event, min_roi, min_profit_usd, fee_bps, profile):
     size, cost = walk_matched_sets(ladders, payout=1.0)
     if size <= 0:
         return None
-    net, roi = _finalize(size, cost, fee_bps, 1.0)
+    net, roi = _finalize(size, cost, fee_bps, gas_per_redeem, 1.0)
     if net < min_profit_usd or roi < min_roi:
         return None
     legs = [
@@ -115,12 +115,12 @@ def _binary_sell(snap, m: Market, min_profit_usd, profile):
 
 
 def detect(snap: Snapshot, *, min_roi: float, min_profit_usd: float,
-           fee_bps: float, profile: str) -> list[Opportunity]:
+           fee_bps: float, profile: str, gas_per_redeem: float = 0.0) -> list[Opportunity]:
     out: list[Opportunity] = []
     for m in snap.markets.values():
         if not m.accepting_orders or not m.is_binary():
             continue
-        b = _binary(snap, m, min_roi, min_profit_usd, fee_bps, profile)
+        b = _binary(snap, m, min_roi, min_profit_usd, fee_bps, gas_per_redeem, profile)
         if b:
             out.append(b)
         s = _binary_sell(snap, m, min_profit_usd, profile)
@@ -128,7 +128,8 @@ def detect(snap: Snapshot, *, min_roi: float, min_profit_usd: float,
             out.append(s)
     for event in snap.events.values():
         if event.neg_risk:
-            n = _neg_risk(snap, event, min_roi, min_profit_usd, fee_bps, profile)
+            n = _neg_risk(snap, event, min_roi, min_profit_usd, fee_bps,
+                          gas_per_redeem, profile)
             if n:
                 out.append(n)
     return out

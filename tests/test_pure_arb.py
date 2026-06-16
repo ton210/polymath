@@ -84,6 +84,19 @@ def test_detects_neg_risk_set_under_one():
     assert neg[0].risk_tier == "risk-free"
 
 
+def test_gas_per_redeem_reduces_net_profit():
+    m = _binary_market("c1", "yes", "no")
+    snap = _snap(
+        [m],
+        [OrderBook("yes", asks=[Level(0.45, 100)]),
+         OrderBook("no", asks=[Level(0.50, 100)])],
+    )
+    opps = detect(snap, min_roi=0.0, min_profit_usd=0.0, fee_bps=0.0,
+                  gas_per_redeem=2.0, profile="default")
+    o = [o for o in opps if o.kind == "binary_yes_no"][0]
+    assert round(o.net_profit, 2) == 3.0   # 5.0 gross edge - 2.0 gas
+
+
 def test_binary_limit_price_is_worst_level_walked():
     # YES fills across two levels (0.40 x60 then 0.42 x60); NO single level 0.50.
     m = _binary_market("c1", "yes", "no")

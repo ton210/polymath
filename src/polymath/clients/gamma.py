@@ -8,6 +8,7 @@ import httpx
 from polymath.model import Market, Token
 
 _PAGE = 500
+_MAX_PAGES = 200   # safety cap: 100k markets, far beyond Polymarket's live count
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -17,6 +18,9 @@ def _parse_dt(value: str | None) -> datetime | None:
 
 
 def _parse_market(raw: dict) -> Market | None:
+    condition_id = raw.get("conditionId")
+    if not condition_id:
+        return None
     try:
         token_ids = json.loads(raw["clobTokenIds"])
         outcomes = json.loads(raw["outcomes"])
@@ -26,7 +30,7 @@ def _parse_market(raw: dict) -> Market | None:
         return None
     tokens = [Token(str(tid), str(o)) for tid, o in zip(token_ids, outcomes)]
     return Market(
-        condition_id=str(raw.get("conditionId")),
+        condition_id=str(condition_id),
         question=raw.get("question", ""),
         slug=raw.get("slug", ""),
         tokens=tokens,
@@ -54,7 +58,7 @@ class GammaClient:
     ) -> list[Market]:
         markets: list[Market] = []
         offset = 0
-        while True:
+        for _ in range(_MAX_PAGES):
             resp = await self._client.get(
                 "/markets",
                 params={"active": "true", "closed": "false",

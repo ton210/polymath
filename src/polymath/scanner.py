@@ -40,5 +40,5 @@ def run_detectors(snap: Snapshot, config: Config, *, profile: str,
     if only in (None, "pure_arb"):
         opps += pure_arb.detect(
             snap, min_roi=eff.min_roi, min_profit_usd=eff.min_profit_usd,
-            fee_bps=eff.fee_bps, profile=profile)
+            fee_bps=eff.fee_bps, gas_per_redeem=eff.gas_per_redeem, profile=profile)
     return sorted(opps, key=lambda o: o.net_profit, reverse=True)
