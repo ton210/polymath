@@ -11,7 +11,10 @@ def _calibration(settled: list[dict]) -> list[dict]:
     buckets = []
     for lo in [i / 10 for i in range(0, 10)]:
         hi = lo + 0.1
-        grp = [r for r in settled if lo <= float(r["our_prob"]) < hi]
+        last = lo >= 0.9 - 1e-9   # include our_prob == 1.0 in the final bucket
+        grp = [r for r in settled
+               if lo <= float(r["our_prob"]) < hi
+               or (last and float(r["our_prob"]) == 1.0)]
         if not grp:
             buckets.append({"bucket": f"{lo:.1f}-{hi:.1f}", "n": 0,
                             "predicted": None, "actual": None})

@@ -72,6 +72,20 @@ def test_extracts_json_when_wrapped_in_prose():
     assert est.category == "politics"
 
 
+def test_extracts_json_despite_prose_braces_around_it():
+    def fake_runner(cmd):
+        inner = ("I'll call {WebSearch} now. Answer: "
+                 "{\"prob\": 0.4, \"confidence\": 0.5, \"category\": \"politics\", "
+                 "\"signals\": {\"source_count\": 2}, \"rationale\": \"x\"} "
+                 "see {ref:1}")
+        return json.dumps({"type": "result", "subtype": "success", "is_error": False,
+                           "result": inner, "usage": {}})
+
+    est = ClaudeCliResearcher(runner=lambda c: fake_runner(c)).research(_m())
+    assert est.prob == 0.4
+    assert est.signals["source_count"] == 2
+
+
 def test_raises_on_cli_error_envelope():
     def fake_runner(cmd):
         return json.dumps({"type": "result", "subtype": "error",

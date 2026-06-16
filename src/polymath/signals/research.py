@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 from typing import Protocol
 
@@ -48,14 +47,29 @@ def _default_runner(cmd: list[str]) -> str:
 
 
 def _extract_json_object(text: str) -> dict:
+    """Return the first brace-balanced substring that parses as a JSON object.
+
+    Robust to prose (incl. stray braces) before or after the JSON, which a greedy
+    regex would mis-span and then drop the whole estimate on.
+    """
     text = text.strip()
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if not match:
-            raise ResearchError("no JSON object in CLI result")
-        return json.loads(match.group(0))
+        pass
+    for start in (i for i, c in enumerate(text) if c == "{"):
+        depth = 0
+        for end in range(start, len(text)):
+            if text[end] == "{":
+                depth += 1
+            elif text[end] == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(text[start:end + 1])
+                    except json.JSONDecodeError:
+                        break   # this candidate isn't valid; try the next "{"
+    raise ResearchError("no JSON object in CLI result")
 
 
 class ClaudeCliResearcher:

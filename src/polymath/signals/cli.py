@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from datetime import datetime, timezone
 
 import typer
@@ -80,16 +81,22 @@ def settle(profile: str = typer.Option("default"), ledger: str = typer.Option(No
     led = Ledger(ledger or cfg.ledger_path)
     rows = led.read_all()
     directional = [r for r in rows if r.get("module") == "news_directional"]
+    open_ids = [r["gamma_id"] for r in directional
+                if r.get("status") == "open" and r.get("gamma_id")]
 
-    async def _resolve(gid):
+    async def _resolve_all(ids: list[str]) -> dict:
+        uniq = [i for i in dict.fromkeys(ids)]   # de-dup, preserve order
         async with GammaClient(cfg.gamma_base) as g:
-            return await g.fetch_market_raw(gid)
+            raws = await asyncio.gather(*(g.fetch_market_raw(i) for i in uniq))
+        return dict(zip(uniq, raws))
+
+    resolved = asyncio.run(_resolve_all(open_ids)) if open_ids else {}
 
     settled = 0
     updated = []
     for r in rows:
         if r.get("module") == "news_directional" and r.get("status") == "open":
-            raw = asyncio.run(_resolve(r["gamma_id"])) if r.get("gamma_id") else None
+            raw = resolved.get(r.get("gamma_id"))
             winner = winner_from_raw(raw) if raw else None
             new = score_bet(r, winner)
             if new.get("status") != "open":
@@ -98,7 +105,11 @@ def settle(profile: str = typer.Option("default"), ledger: str = typer.Option(No
         else:
             updated.append(r)
 
-    led.path.write_text("".join(json.dumps(r) + "\n" for r in updated))
+    # Atomic write: serialize to a temp file in the same dir, then rename, so an
+    # interrupted settle can never truncate the ledger (which holds arb rows too).
+    tmp = led.path.with_name(led.path.name + ".tmp")
+    tmp.write_text("".join(json.dumps(r) + "\n" for r in updated))
+    os.replace(tmp, led.path)
     console.print(f"[green]settled {settled} of {len(directional)} directional bets[/green]")
 
 

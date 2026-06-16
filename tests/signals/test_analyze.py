@@ -25,6 +25,14 @@ def test_report_aggregates_winrate_roi_and_calibration():
     assert any(b["n"] > 0 for b in rep["calibration"])
 
 
+def test_calibration_includes_prob_one_in_top_bucket():
+    # a NO bet with estimate.prob 0.0 -> our_prob 1.0 must not vanish from calibration
+    rows = [_settled("No", 0.30, 1.0, True), _settled("No", 0.30, 1.0, False)]
+    rep = build_report(rows)
+    top = [b for b in rep["calibration"] if b["bucket"] == "0.9-1.0"][0]
+    assert top["n"] == 2
+
+
 def test_signal_attribution_splits_by_feature_median():
     rows = [
         _settled("Yes", 0.5, 0.7, True, signals={"consensus_strength": 0.9}),

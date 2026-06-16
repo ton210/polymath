@@ -23,6 +23,12 @@ def test_none_when_not_resolved():
     assert winner_from_raw(raw) is None
 
 
+def test_winner_with_rounded_resolved_prices():
+    raw = {"closed": True, "umaResolutionStatus": "resolved",
+           "outcomes": "[\"Yes\", \"No\"]", "outcomePrices": "[\"0.999\", \"0.001\"]"}
+    assert winner_from_raw(raw) == "Yes"
+
+
 def test_none_when_void_double_zero():
     raw = {"closed": True, "umaResolutionStatus": "resolved",
            "outcomes": "[\"Yes\", \"No\"]", "outcomePrices": "[\"0\", \"0\"]"}
