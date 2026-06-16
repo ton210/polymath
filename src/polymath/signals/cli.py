@@ -45,6 +45,11 @@ def bet(profile: str = typer.Option("default"), ledger: str = typer.Option(None)
     led = Ledger(ledger or cfg.ledger_path)
     researcher = _make_researcher(cfg)
 
+    # Don't re-bet a market we've already bet on an earlier day: a market resolving
+    # within the window reappears in the candidate pool until it resolves.
+    already_bet = {r.get("condition_id") for r in led.read_all()
+                   if r.get("module") == "news_directional"}
+
     async def _markets():
         async with GammaClient(cfg.gamma_base) as g:
             return await g.fetch_active_markets(
@@ -55,6 +60,7 @@ def bet(profile: str = typer.Option("default"), ledger: str = typer.Option(None)
         markets, _now(), window_hours=cfg.bet_window_hours,
         min_liquidity=cfg.bet_min_liquidity, max_candidates=cfg.max_candidates,
         max_per_event=cfg.max_per_event)
+    candidates = [m for m in candidates if m.condition_id not in already_bet]
 
     rows = []
     for m in candidates:

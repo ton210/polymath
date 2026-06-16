@@ -67,3 +67,18 @@ def test_bet_then_settle_then_analyze(monkeypatch, tmp_path):
     r3 = runner.invoke(main_cli.app, ["analyze", "--ledger", str(ledger)])
     assert r3.exit_code == 0, r3.output
     assert "win" in r3.output.lower()
+
+
+def test_bet_does_not_rebet_already_bet_markets(monkeypatch, tmp_path):
+    ledger = tmp_path / "ledger.jsonl"
+    markets = [_m("c1", "11", 0.50), _m("c2", "22", 0.50)]
+    estimates = {"c1": Estimate(0.75, 0.8, "sports", {}, "r"),
+                 "c2": Estimate(0.70, 0.7, "politics", {}, "r")}
+    _patch(monkeypatch, markets, estimates)
+
+    runner.invoke(main_cli.app, ["bet", "--ledger", str(ledger), "--min-edge", "0.1"])
+    first = len(Ledger(ledger).read_all())
+    assert first == 2
+    # Same markets still near-term the next day -> a second run must add nothing.
+    runner.invoke(main_cli.app, ["bet", "--ledger", str(ledger), "--min-edge", "0.1"])
+    assert len(Ledger(ledger).read_all()) == 2
