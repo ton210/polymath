@@ -7,17 +7,22 @@ from polymath.signals.estimate import Estimate
 
 
 def build_bet(market: Market, estimate: Estimate, *, min_edge: float, stake: float,
-              profile: str, timestamp: datetime) -> dict | None:
+              profile: str, timestamp: datetime, max_edge: float = 1.0) -> dict | None:
     """Return a ledger row for a directional bet, or None if no qualifying edge.
 
     Bets YES when our prob exceeds the YES price, else NO. entry_price is the price
     of the chosen side; our_prob is our probability for that same side.
+
+    Edges above ``max_edge`` are skipped: on a liquid market a 25+ point disagreement
+    almost always means the model misread the resolution rule, not a real opportunity
+    (e.g. estimating 0.97 on a market priced 0.04).
     """
     if market.yes_price is None:
         return None
     yes_price = market.yes_price
     edge_yes = estimate.prob - yes_price
-    if abs(edge_yes) < min_edge:
+    magnitude = abs(edge_yes)
+    if magnitude < min_edge or magnitude > max_edge:
         return None
     if edge_yes > 0:
         side, entry_price, our_prob = "Yes", yes_price, estimate.prob
@@ -38,9 +43,10 @@ def build_bet(market: Market, estimate: Estimate, *, min_edge: float, stake: flo
         "entry_price": entry_price,
         "our_prob": our_prob,
         "market_prob": entry_price,
-        "edge": abs(edge_yes),
+        "edge": magnitude,
         "confidence": estimate.confidence,
-        "signals": dict(estimate.signals),
+        "rationale": estimate.rationale,        # the model's reasoning, for auditing
+        "signals": dict(estimate.signals),      # includes grounded, tool_turns, sources
         "stake": stake,
         "status": "open",
         "realized_pnl": None,

@@ -28,6 +28,7 @@ class Config:
     bets_per_day: int = 8
     bet_stake: float = 100.0
     min_edge: float = 0.05   # diverse sampling deliberately includes small edges
+    max_edge: float = 0.25   # above this, a disagreement is almost surely a misread
     claude_cli_path: str = "claude"
     research_model: str | None = None
     research_timeout: int = 180

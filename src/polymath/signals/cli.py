@@ -69,8 +69,8 @@ def bet(profile: str = typer.Option("default"), ledger: str = typer.Option(None)
         except Exception as exc:   # research failures skip one market, never abort
             console.print(f"[yellow]skip {m.condition_id}: {exc}[/yellow]")
             continue
-        row = build_bet(m, est, min_edge=edge, stake=cfg.bet_stake,
-                        profile=profile, timestamp=_now())
+        row = build_bet(m, est, min_edge=edge, max_edge=cfg.max_edge,
+                        stake=cfg.bet_stake, profile=profile, timestamp=_now())
         if row:
             rows.append(row)
 
