@@ -59,11 +59,19 @@ class GammaClient:
         markets: list[Market] = []
         offset = 0
         for _ in range(_MAX_PAGES):
-            resp = await self._client.get(
-                "/markets",
-                params={"active": "true", "closed": "false",
-                        "limit": _PAGE, "offset": offset},
-            )
+            params: dict = {"active": "true", "closed": "false",
+                            "limit": _PAGE, "offset": offset}
+            # Filter server-side so we page through only liquid/active markets
+            # instead of every market then discarding most.
+            if min_liquidity > 0:
+                params["liquidity_num_min"] = min_liquidity
+            if min_volume > 0:
+                params["volume_num_min"] = min_volume
+            resp = await self._client.get("/markets", params=params)
+            # Gamma returns 422 for offsets past the end of the result set rather
+            # than an empty page; treat that as end-of-data once we've started.
+            if resp.status_code == 422 and offset > 0:
+                break
             resp.raise_for_status()
             batch = resp.json()
             if not batch:

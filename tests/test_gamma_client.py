@@ -32,6 +32,20 @@ async def test_fetch_active_markets_paginates_and_parses():
 
 
 @respx.mock
+async def test_fetch_active_markets_stops_on_deep_offset_422():
+    # Gamma returns 422 (not an empty page) once offset runs past the data.
+    page1 = json.loads((FIX / "gamma_markets_page1.json").read_text())
+    respx.get("https://gamma-api.polymarket.com/markets").side_effect = [
+        httpx.Response(200, json=page1),
+        httpx.Response(422, json={"error": "offset too large"}),
+    ]
+    async with GammaClient("https://gamma-api.polymarket.com") as client:
+        markets = await client.fetch_active_markets(min_liquidity=0, min_volume=0)
+    # Page 1 markets are kept; the 422 ends pagination instead of crashing.
+    assert {m.condition_id for m in markets} == {"c1", "c2"}
+
+
+@respx.mock
 async def test_fetch_active_markets_filters_low_liquidity():
     page1 = json.loads((FIX / "gamma_markets_page1.json").read_text())
     empty = json.loads((FIX / "gamma_markets_empty.json").read_text())
