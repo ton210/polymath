@@ -25,13 +25,15 @@ class StubResearcher:
 _PROMPT = (
     "You are estimating the probability of a Polymarket YES outcome.\n"
     "Question: {question}\n"
-    "Use web search to gather the most recent, relevant facts, then respond with "
+    "You MUST use WebSearch to gather current facts before answering. Your training "
+    "data is stale and prices, scores, standings, and news will have changed since "
+    "then; prefer fresh search results over memory. After searching, respond with "
     "ONLY a single JSON object (no prose) of the form:\n"
     '{{"prob": <0..1 probability of YES>, "confidence": <0..1>, '
     '"category": "sports|politics|world-news|other", '
     '"signals": {{"latest_news_age_hours": <number>, "news_direction": "yes|no|mixed", '
     '"consensus_strength": <0..1>, "source_count": <int>}}, '
-    '"rationale": "<one sentence>"}}'
+    '"rationale": "<one sentence>", "sources": ["<url you actually used>", ...]}}'
 )
 
 
@@ -100,11 +102,18 @@ class ClaudeCliResearcher:
         result_text = str(envelope.get("result", ""))
         payload = _extract_json_object(result_text)
         signals = dict(payload.get("signals") or {})
-        # Claude Code's native WebSearch tool does NOT increment the API's
-        # server_tool_use counter, so detect real grounding from cited source URLs
-        # in the response. This is the signal that tells us whether the estimate
-        # was actually informed by live data vs answered from priors.
-        signals["grounded"] = "http" in result_text.lower()
+        # Grounding signal: Claude Code's native WebSearch does NOT increment the
+        # API's server_tool_use counter, and the pure-JSON answer carries no source
+        # URLs in its text — so neither of those is usable. The reliable signal is
+        # num_turns: a single turn means the model answered from memory, while >1
+        # means it took web-search round-trips before answering.
+        num_turns = envelope.get("num_turns", 1)
+        signals["tool_turns"] = num_turns
+        signals["grounded"] = num_turns > 1
+        sources = payload.get("sources")
+        if isinstance(sources, list):
+            signals["sources"] = sources
+            signals["source_count"] = len(sources)   # trust real URLs over self-report
         searches = (envelope.get("usage") or {}).get("server_tool_use", {})
         if searches.get("web_search_requests"):
             signals["web_search_requests"] = searches["web_search_requests"]

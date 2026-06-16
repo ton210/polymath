@@ -18,7 +18,7 @@ def test_builds_command_and_parses_estimate():
         inner = json.dumps({"prob": 0.66, "confidence": 0.6, "category": "sports",
                             "signals": {"source_count": 3}, "rationale": "favored"})
         return json.dumps({"type": "result", "subtype": "success",
-                           "is_error": False, "result": inner,
+                           "is_error": False, "result": inner, "num_turns": 4,
                            "usage": {"server_tool_use": {"web_search_requests": 2}}})
 
     r = ClaudeCliResearcher(runner=fake_runner, cli_path="claude", model="claude-x")
@@ -33,30 +33,36 @@ def test_builds_command_and_parses_estimate():
     assert est.prob == 0.66
     assert est.category == "sports"
     assert est.signals["source_count"] == 3
-    assert est.signals["web_search_requests"] == 2
+    assert est.signals["grounded"] is True       # num_turns 4 > 1 -> searched
+    assert est.signals["tool_turns"] == 4
 
 
-def test_grounded_true_when_response_cites_source_urls():
+def test_grounded_true_when_model_took_tool_turns():
+    # num_turns > 1 means the model called WebSearch (round-trips), even though the
+    # pure-JSON answer carries no URLs in its text.
     def fake_runner(cmd):
-        inner = (json.dumps({"prob": 0.3, "confidence": 0.5, "category": "world-news",
-                             "signals": {"source_count": 2}, "rationale": "r"})
-                 + "\n\nSources:\n- https://example.com/news")
+        inner = json.dumps({"prob": 0.3, "confidence": 0.5, "category": "world-news",
+                            "signals": {}, "rationale": "r",
+                            "sources": ["https://a.com", "https://b.com"]})
         return json.dumps({"type": "result", "subtype": "success", "is_error": False,
-                           "result": inner, "usage": {}})
+                           "result": inner, "num_turns": 3, "usage": {}})
 
     est = ClaudeCliResearcher(runner=lambda c: fake_runner(c)).research(_m())
     assert est.signals["grounded"] is True
+    assert est.signals["sources"] == ["https://a.com", "https://b.com"]
+    assert est.signals["source_count"] == 2     # derived from real source URLs
 
 
-def test_grounded_false_when_no_sources():
+def test_grounded_false_when_single_turn():
     def fake_runner(cmd):
         inner = json.dumps({"prob": 0.3, "confidence": 0.5, "category": "world-news",
-                            "signals": {}, "rationale": "answered from priors"})
+                            "signals": {}, "rationale": "answered from memory"})
         return json.dumps({"type": "result", "subtype": "success", "is_error": False,
-                           "result": inner, "usage": {}})
+                           "result": inner, "num_turns": 1, "usage": {}})
 
     est = ClaudeCliResearcher(runner=lambda c: fake_runner(c)).research(_m())
     assert est.signals["grounded"] is False
+    assert est.signals["tool_turns"] == 1
 
 
 def test_extracts_json_when_wrapped_in_prose():
