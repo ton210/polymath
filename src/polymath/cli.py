@@ -15,8 +15,10 @@ from polymath.ledger import Ledger
 from polymath.paper import PaperBook
 from polymath.report import build_scorecard
 from polymath.scanner import build_snapshot, run_detectors
+from polymath.signals.cli import app as signals_app
 
 app = typer.Typer(add_completion=False, help="Polymarket arbitrage scanner")
+app.add_typer(signals_app)
 console = Console()
 
 _BADGE = {"risk-free": "🔒", "structural": "🟡", "directional": "⚠️"}

@@ -20,6 +20,16 @@ class Config:
     ledger_path: str = "ledger.jsonl"
     gamma_base: str = "https://gamma-api.polymarket.com"
     clob_base: str = "https://clob.polymarket.com"
+    # News-signal directional pilot
+    bet_window_hours: int = 48
+    bet_min_liquidity: float = 500.0
+    max_candidates: int = 40
+    bets_per_day: int = 8
+    bet_stake: float = 100.0
+    min_edge: float = 0.10
+    claude_cli_path: str = "claude"
+    research_model: str | None = None
+    research_timeout: int = 180
     profiles: dict[str, dict] = field(default_factory=lambda: {"default": {}})
 
     def effective(self, profile: str) -> "Config":
