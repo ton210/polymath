@@ -1,0 +1,32 @@
+[
+  {
+    "conditionId": "c1",
+    "question": "Will X win?",
+    "slug": "will-x-win",
+    "clobTokenIds": "[\"yes1\", \"no1\"]",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "active": true,
+    "closed": false,
+    "acceptingOrders": true,
+    "negRisk": true,
+    "negRiskMarketID": "E1",
+    "liquidityNum": 12000,
+    "volumeNum": 50000,
+    "endDate": "2026-11-03T00:00:00Z"
+  },
+  {
+    "conditionId": "c2",
+    "question": "Will Y win?",
+    "slug": "will-y-win",
+    "clobTokenIds": "[\"yes2\", \"no2\"]",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "active": true,
+    "closed": false,
+    "acceptingOrders": true,
+    "negRisk": true,
+    "negRiskMarketID": "E1",
+    "liquidityNum": 8000,
+    "volumeNum": 30000,
+    "endDate": "2026-11-03T00:00:00Z"
+  }
+]
