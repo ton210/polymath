@@ -55,6 +55,14 @@ class Market:
     def is_binary(self) -> bool:
         return len(self.tokens) == 2
 
+    def is_yes_no(self) -> bool:
+        """True only for genuine Yes/No markets. Some binary Polymarket markets use
+        entity outcomes (e.g. ["Colombia","Uzbekistan"] for a spread); those break
+        the directional tool's Yes/No side-labeling and settlement, and the "YES
+        probability" framing is undefined for them, so they must be excluded."""
+        return (self.is_binary()
+                and {t.outcome.strip().lower() for t in self.tokens} == {"yes", "no"})
+
     def token_for(self, outcome: str) -> Token:
         for t in self.tokens:
             if t.outcome.lower() == outcome.lower():

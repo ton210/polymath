@@ -19,7 +19,7 @@ def select_near_term(markets: list[Market], now: datetime, *, window_hours: int,
     horizon = now + timedelta(hours=window_hours)
     eligible = [
         m for m in markets
-        if m.accepting_orders and m.is_binary() and m.yes_price is not None
+        if m.accepting_orders and m.is_yes_no() and m.yes_price is not None
         and m.end_date is not None and now < m.end_date <= horizon
         and m.liquidity >= min_liquidity
     ]

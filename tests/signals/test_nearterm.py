@@ -7,8 +7,8 @@ NOW = datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc)
 
 
 def _m(cid, hours, *, liq=1000.0, accepting=True, yes_price=0.5, binary=True,
-       event_id=None):
-    toks = [Token(f"{cid}y", "Yes"), Token(f"{cid}n", "No")]
+       event_id=None, outcomes=("Yes", "No")):
+    toks = [Token(f"{cid}y", outcomes[0]), Token(f"{cid}n", outcomes[1])]
     if not binary:
         toks = toks + [Token(f"{cid}z", "Maybe")]
     return Market(cid, f"Q{cid}", cid, toks, neg_risk=False, neg_risk_market_id=None,
@@ -26,6 +26,7 @@ def test_selects_only_within_window_liquid_binary_accepting():
         _m("e", 10, binary=False),        # not binary
         _m("f", -5),                      # already past end -> excluded
         _m("g", 10, yes_price=None),      # no current price -> excluded
+        _m("h", 10, outcomes=("Colombia", "Uzbekistan")),  # binary but not Yes/No
     ]
     out = select_near_term(markets, NOW, window_hours=48, min_liquidity=500,
                            max_candidates=40)
