@@ -116,3 +116,11 @@ class GammaClient:
     ) -> dict[str, tuple[str, list[Market]]]:
         results = await asyncio.gather(*(self._fetch_event(e) for e in event_ids))
         return {eid: res for eid, res in zip(event_ids, results) if res is not None}
+
+    async def fetch_market_raw(self, gamma_id: str) -> dict | None:
+        """Fetch a single market by its numeric Gamma id (works for closed markets,
+        unlike the active-filtered list endpoint). Returns the raw JSON dict."""
+        resp = await self._client.get(f"/markets/{gamma_id}")
+        if resp.status_code != 200:
+            return None
+        return resp.json()
