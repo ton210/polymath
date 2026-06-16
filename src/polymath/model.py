@@ -48,6 +48,7 @@ class Market:
     end_date: datetime | None
     liquidity: float
     volume: float
+    event_id: str | None = None
 
     def is_binary(self) -> bool:
         return len(self.tokens) == 2

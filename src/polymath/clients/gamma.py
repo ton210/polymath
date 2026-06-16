@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import datetime
 
@@ -29,6 +30,8 @@ def _parse_market(raw: dict) -> Market | None:
     if len(token_ids) != len(outcomes) or len(token_ids) < 2:
         return None
     tokens = [Token(str(tid), str(o)) for tid, o in zip(token_ids, outcomes)]
+    events = raw.get("events") or []
+    event_id = str(events[0]["id"]) if events and events[0].get("id") is not None else None
     return Market(
         condition_id=str(condition_id),
         question=raw.get("question", ""),
@@ -40,6 +43,7 @@ def _parse_market(raw: dict) -> Market | None:
         end_date=_parse_dt(raw.get("endDate")),
         liquidity=float(raw.get("liquidityNum") or 0.0),
         volume=float(raw.get("volumeNum") or 0.0),
+        event_id=event_id,
     )
 
 
@@ -85,3 +89,20 @@ class GammaClient:
                 markets.append(m)
             offset += _PAGE
         return markets
+
+    async def _fetch_event(self, event_id: str) -> tuple[str, list[Market]] | None:
+        """Authoritative full membership of one event (no liquidity filter), so a
+        neg-risk set is never silently truncated by the market-level filter."""
+        resp = await self._client.get(f"/events/{event_id}")
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        members = [m for m in (_parse_market(raw) for raw in data.get("markets", []))
+                   if m is not None]
+        return str(data.get("title") or event_id), members
+
+    async def fetch_events(
+        self, event_ids: list[str]
+    ) -> dict[str, tuple[str, list[Market]]]:
+        results = await asyncio.gather(*(self._fetch_event(e) for e in event_ids))
+        return {eid: res for eid, res in zip(event_ids, results) if res is not None}
