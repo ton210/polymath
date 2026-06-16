@@ -19,6 +19,24 @@ def effective_ask_ladder(own: OrderBook, complement: OrderBook | None) -> list[L
     return sorted(levels, key=lambda l: l.price)
 
 
+def worst_fill_price(ladder: list[Level], size: float) -> float:
+    """Highest price level consumed to fill ``size`` from an ascending ladder.
+
+    This is the limit price an order must be willing to accept to fill the full
+    ``size`` — quoting the best level instead would under-fill the position.
+    """
+    if size <= 0 or not ladder:
+        return 0.0
+    cum = 0.0
+    price = ladder[0].price
+    for lvl in ladder:
+        price = lvl.price
+        cum += lvl.size
+        if cum >= size - _EPS:
+            break
+    return price
+
+
 def walk_matched_sets(
     leg_ladders: list[list[Level]], payout: float = 1.0
 ) -> tuple[float, float]:

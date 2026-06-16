@@ -84,6 +84,52 @@ def test_detects_neg_risk_set_under_one():
     assert neg[0].risk_tier == "risk-free"
 
 
+def test_binary_limit_price_is_worst_level_walked():
+    # YES fills across two levels (0.40 x60 then 0.42 x60); NO single level 0.50.
+    m = _binary_market("c1", "yes", "no")
+    snap = _snap(
+        [m],
+        [OrderBook("yes", asks=[Level(0.40, 60), Level(0.42, 60)]),
+         OrderBook("no", asks=[Level(0.50, 200)])],
+    )
+    opps = detect(snap, min_roi=0.0, min_profit_usd=0.0, fee_bps=0.0, profile="default")
+    o = [o for o in opps if o.kind == "binary_yes_no"][0]
+    # Profitable depth: marginal 0.40+0.50=0.90, then 0.42+0.50=0.92, both < 1 -> 120 sets.
+    assert o.fillable_size == 120
+    yes_leg = [l for l in o.legs if l.outcome == "Yes"][0]
+    assert yes_leg.limit_price == 0.42   # worst level walked, not 0.40
+
+
+def test_neg_risk_skips_event_with_nonbinary_member():
+    m1 = _binary_market("c1", "y1", "n1", neg_risk=True, nrm="E")
+    # c2 is non-binary (3 tokens) -> event must be skipped, not crash.
+    m2 = Market("c2", "Q c2", "c2",
+                tokens=[Token("a", "A"), Token("b", "B"), Token("c", "C")],
+                neg_risk=True, neg_risk_market_id="E", accepting_orders=True,
+                end_date=None, liquidity=1.0, volume=1.0)
+    event = Event(id="E", title="race", neg_risk=True,
+                  market_condition_ids=["c1", "c2"])
+    snap = _snap(
+        [m1, m2],
+        [OrderBook("y1", asks=[Level(0.10, 100)]), OrderBook("n1")],
+        events={"E": event},
+    )
+    opps = detect(snap, min_roi=0.0, min_profit_usd=0.0, fee_bps=0.0, profile="default")
+    assert [o for o in opps if o.kind == "neg_risk_set"] == []
+
+
+def test_binary_sell_set_respects_min_profit():
+    m = _binary_market("c1", "yes", "no")
+    snap = _snap(
+        [m],
+        [OrderBook("yes", bids=[Level(0.52, 100)]),
+         OrderBook("no", bids=[Level(0.50, 100)])],   # sum 1.02 -> net 2.0 on 100
+    )
+    # net = 100 * 0.02 = 2.0; threshold 5.0 filters it out.
+    opps = detect(snap, min_roi=0.0, min_profit_usd=5.0, fee_bps=0.0, profile="default")
+    assert [o for o in opps if o.kind == "sell_set"] == []
+
+
 def test_flags_binary_sell_set_over_one():
     m = _binary_market("c1", "yes", "no")
     snap = _snap(

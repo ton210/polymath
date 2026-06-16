@@ -1,5 +1,14 @@
 from polymath.model import Level, OrderBook
-from polymath.pricing import effective_ask_ladder, walk_matched_sets
+from polymath.pricing import effective_ask_ladder, walk_matched_sets, worst_fill_price
+
+
+def test_worst_fill_price_is_deepest_level_needed():
+    ladder = [Level(0.30, 20), Level(0.40, 100)]
+    assert worst_fill_price(ladder, 10) == 0.30    # fits in first level
+    assert worst_fill_price(ladder, 20) == 0.30    # exactly first level
+    assert worst_fill_price(ladder, 50) == 0.40    # spills into second level
+    assert worst_fill_price([], 5) == 0.0
+    assert worst_fill_price(ladder, 0) == 0.0
 
 
 def test_effective_ask_ladder_merges_synthetic_from_complement_bids():
