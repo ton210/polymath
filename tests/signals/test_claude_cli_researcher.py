@@ -36,6 +36,29 @@ def test_builds_command_and_parses_estimate():
     assert est.signals["web_search_requests"] == 2
 
 
+def test_grounded_true_when_response_cites_source_urls():
+    def fake_runner(cmd):
+        inner = (json.dumps({"prob": 0.3, "confidence": 0.5, "category": "world-news",
+                             "signals": {"source_count": 2}, "rationale": "r"})
+                 + "\n\nSources:\n- https://example.com/news")
+        return json.dumps({"type": "result", "subtype": "success", "is_error": False,
+                           "result": inner, "usage": {}})
+
+    est = ClaudeCliResearcher(runner=lambda c: fake_runner(c)).research(_m())
+    assert est.signals["grounded"] is True
+
+
+def test_grounded_false_when_no_sources():
+    def fake_runner(cmd):
+        inner = json.dumps({"prob": 0.3, "confidence": 0.5, "category": "world-news",
+                            "signals": {}, "rationale": "answered from priors"})
+        return json.dumps({"type": "result", "subtype": "success", "is_error": False,
+                           "result": inner, "usage": {}})
+
+    est = ClaudeCliResearcher(runner=lambda c: fake_runner(c)).research(_m())
+    assert est.signals["grounded"] is False
+
+
 def test_extracts_json_when_wrapped_in_prose():
     def fake_runner(cmd):
         inner = "Here is my answer:\n{\"prob\": 0.4, \"confidence\": 0.5, " \

@@ -83,10 +83,16 @@ class ClaudeCliResearcher:
             raise ResearchError(f"CLI did not return JSON: {e}") from e
         if envelope.get("is_error") or envelope.get("subtype") != "success":
             raise ResearchError(f"CLI research failed: {envelope.get('subtype')}")
-        payload = _extract_json_object(str(envelope.get("result", "")))
+        result_text = str(envelope.get("result", ""))
+        payload = _extract_json_object(result_text)
         signals = dict(payload.get("signals") or {})
+        # Claude Code's native WebSearch tool does NOT increment the API's
+        # server_tool_use counter, so detect real grounding from cited source URLs
+        # in the response. This is the signal that tells us whether the estimate
+        # was actually informed by live data vs answered from priors.
+        signals["grounded"] = "http" in result_text.lower()
         searches = (envelope.get("usage") or {}).get("server_tool_use", {})
-        if "web_search_requests" in searches:
+        if searches.get("web_search_requests"):
             signals["web_search_requests"] = searches["web_search_requests"]
         return Estimate(
             prob=payload.get("prob", 0.5),
