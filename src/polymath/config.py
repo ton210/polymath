@@ -24,6 +24,7 @@ class Config:
     bet_window_hours: int = 48
     bet_min_liquidity: float = 500.0
     max_candidates: int = 40
+    max_per_event: int = 2
     bets_per_day: int = 8
     bet_stake: float = 100.0
     min_edge: float = 0.10

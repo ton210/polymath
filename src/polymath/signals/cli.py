@@ -53,7 +53,8 @@ def bet(profile: str = typer.Option("default"), ledger: str = typer.Option(None)
     markets = asyncio.run(_markets())
     candidates = select_near_term(
         markets, _now(), window_hours=cfg.bet_window_hours,
-        min_liquidity=cfg.bet_min_liquidity, max_candidates=cfg.max_candidates)
+        min_liquidity=cfg.bet_min_liquidity, max_candidates=cfg.max_candidates,
+        max_per_event=cfg.max_per_event)
 
     rows = []
     for m in candidates:
