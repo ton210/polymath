@@ -7,7 +7,8 @@ from polymath.signals.estimate import Estimate
 
 
 def build_bet(market: Market, estimate: Estimate, *, min_edge: float, stake: float,
-              profile: str, timestamp: datetime, max_edge: float = 1.0) -> dict | None:
+              profile: str, timestamp: datetime, max_edge: float = 1.0,
+              min_price: float = 0.0, max_price: float = 1.0) -> dict | None:
     """Return a ledger row for a directional bet, or None if no qualifying edge.
 
     Bets YES when our prob exceeds the YES price, else NO. entry_price is the price
@@ -16,10 +17,16 @@ def build_bet(market: Market, estimate: Estimate, *, min_edge: float, stake: flo
     Edges above ``max_edge`` are skipped: on a liquid market a 25+ point disagreement
     almost always means the model misread the resolution rule, not a real opportunity
     (e.g. estimating 0.97 on a market priced 0.04).
+
+    Markets whose YES price is outside ``[min_price, max_price]`` are skipped: at
+    extreme prices a small edge is a several-multiple relative call where the model
+    is poorly calibrated and a flat stake is a high-variance lottery ticket.
     """
     if market.yes_price is None:
         return None
     yes_price = market.yes_price
+    if yes_price < min_price or yes_price > max_price:
+        return None
     edge_yes = estimate.prob - yes_price
     magnitude = abs(edge_yes)
     if magnitude < min_edge or magnitude > max_edge:

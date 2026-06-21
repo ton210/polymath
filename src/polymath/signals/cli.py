@@ -70,6 +70,7 @@ def bet(profile: str = typer.Option("default"), ledger: str = typer.Option(None)
             console.print(f"[yellow]skip {m.condition_id}: {exc}[/yellow]")
             continue
         row = build_bet(m, est, min_edge=edge, max_edge=cfg.max_edge,
+                        min_price=cfg.min_price, max_price=cfg.max_price,
                         stake=cfg.bet_stake, profile=profile, timestamp=_now())
         if row:
             rows.append(row)

@@ -29,6 +29,8 @@ class Config:
     bet_stake: float = 100.0
     min_edge: float = 0.05   # diverse sampling deliberately includes small edges
     max_edge: float = 0.25   # above this, a disagreement is almost surely a misread
+    min_price: float = 0.10  # skip lottery-ticket longshots where the model is
+    max_price: float = 0.90  # least calibrated and variance dominates
     claude_cli_path: str = "claude"
     research_model: str | None = None
     research_timeout: int = 180

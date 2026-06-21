@@ -65,6 +65,21 @@ def test_skips_implausibly_large_edge_as_misread():
     assert row is None
 
 
+def test_skips_extreme_price_longshots():
+    # market at 4c with a small edge -> skipped (lottery ticket, poorly calibrated)
+    assert build_bet(_m(yes_price=0.04), _est(0.12), min_edge=0.05, min_price=0.10,
+                     max_price=0.90, stake=100.0, profile="default", timestamp=TS) is None
+    # market at 96c -> also skipped
+    assert build_bet(_m(yes_price=0.96), _est(0.88), min_edge=0.05, min_price=0.10,
+                     max_price=0.90, stake=100.0, profile="default", timestamp=TS) is None
+
+
+def test_keeps_mid_price_bet_within_band():
+    row = build_bet(_m(yes_price=0.50), _est(0.60), min_edge=0.05, min_price=0.10,
+                    max_price=0.90, stake=100.0, profile="default", timestamp=TS)
+    assert row is not None and row["side"] == "Yes"
+
+
 def test_keeps_edge_at_max_boundary():
     row = build_bet(_m(yes_price=0.50), _est(0.75), min_edge=0.05, max_edge=0.25,
                     stake=100.0, profile="default", timestamp=TS)
