@@ -97,7 +97,10 @@ class GammaClient:
                 if m.liquidity < min_liquidity or m.volume < min_volume:
                     continue
                 markets.append(m)
-            offset += _PAGE
+            # Advance by however many the API actually returned — Gamma caps the
+            # page at ~100 regardless of `limit`, so a fixed +_PAGE stride would
+            # skip every market between the returned page and the next offset.
+            offset += len(batch)
         return markets
 
     async def _fetch_event(self, event_id: str) -> tuple[str, list[Market]] | None:

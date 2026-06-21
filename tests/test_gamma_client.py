@@ -32,6 +32,27 @@ async def test_fetch_active_markets_paginates_and_parses():
 
 
 @respx.mock
+async def test_pagination_advances_by_actual_batch_size_not_limit():
+    # Gamma caps the page below the requested limit; offset must advance by the
+    # number actually returned, or markets between pages get silently skipped.
+    def _mkt(cid):
+        return {"conditionId": cid, "question": "Q", "slug": cid,
+                "clobTokenIds": "[\"y\",\"n\"]", "outcomes": "[\"Yes\",\"No\"]",
+                "active": True, "closed": False, "acceptingOrders": True,
+                "negRisk": False, "liquidityNum": 1000, "volumeNum": 1000}
+    page1 = [_mkt(f"a{i}") for i in range(3)]   # 3 returned despite limit=500
+    route = respx.get("https://gamma-api.polymarket.com/markets")
+    route.side_effect = [
+        httpx.Response(200, json=page1),
+        httpx.Response(200, json=[]),
+    ]
+    async with GammaClient("https://gamma-api.polymarket.com") as client:
+        await client.fetch_active_markets(min_liquidity=0, min_volume=0)
+    # second request's offset must equal the first batch length (3), not 500
+    assert route.calls[1].request.url.params["offset"] == "3"
+
+
+@respx.mock
 async def test_fetch_active_markets_stops_on_deep_offset_422():
     # Gamma returns 422 (not an empty page) once offset runs past the data.
     page1 = json.loads((FIX / "gamma_markets_page1.json").read_text())
